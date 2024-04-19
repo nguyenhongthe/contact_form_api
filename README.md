@@ -10,9 +10,36 @@ Welcome to Contact Form API documentation. This is FastAPI-based API is designed
 - [Configuration](#configuration)
 - [License](#license)
 
+## Features
+
+- Submit contact forms with the following fields:
+  - Name
+  - Email
+  - Phone
+  - Title
+  - Message
+- Send email notifications to the recipient
+- Send Discord notifications to a Discord webhook
+- Store contact form submissions in a PostgreSQL database
+- API documentation using Swagger UI and ReDoc
+
 ## Requirements
 
 - Python 3.8+
+
+The API is built using the following libraries:
+
+- [FastAPI](https://fastapi.tiangolo.com/) - Web framework
+- [Pydantic](https://pypi.org/project/pydantic-settings/) - Settings management using Pydantic
+- [SQLAlchemy](https://www.sqlalchemy.org/) - Database ORM
+- [PostgreSQL](https://www.postgresql.org/) - Database
+- [Psycopg](https://pypi.org/project/psycopg2-binary/) - psycopg2 - Python-PostgreSQL Database Adapter
+- [Python-Multipart](https://pypi.org/project/python-multipart/) - A streaming multipart parser for Python.
+- [smtp](https://docs.python.org/3/library/smtplib.html) - Email sending
+- [uvicorn](https://www.uvicorn.org/) - ASGI server
+- [python-dotenv](https://pypi.org/project/python-dotenv/) - Environment variables
+- [httpx](https://www.python-httpx.org/) - HTTP client
+- [Discord Webhooks](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) - Discord Webhooks
 
 ## Installation
 
