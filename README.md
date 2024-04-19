@@ -43,9 +43,9 @@ The API should now be up and running at http://localhost:8000.
 
 API documentation can be accessed through the following URLs:
 
-- [Swagger UI](http://localhost:8000/api/docs)
-- [ReDoc](http://localhost:8000/api/redoc)
-- [OpenAPI JSON](http://localhost:8000/api/openapi.json)
+- [Swagger UI - http://localhost:8000/api/docs](http://localhost:8000/api/docs)
+- [ReDoc - http://localhost:8000/api/redoc](http://localhost:8000/api/redoc)
+- [OpenAPI JSON - http://localhost:8000/api/openapi.json](http://localhost:8000/api/openapi.json)
 
 ### Submitting a Contact Form
 
@@ -54,7 +54,7 @@ To submit a contact form, send a POST request to the `/submit-contact-form` endp
 - `name`: Name of the sender
 - `email`: Email of the sender
 - `phone`: Phone number of the sender
-- `budget`: Budget information
+- `title`: Title of the message
 - `message`: Message content
 
 Example using cURL:
