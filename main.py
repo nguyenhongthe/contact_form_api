@@ -43,7 +43,8 @@ class Settings(BaseSettings):
     postgres_url: str = os.getenv('POSTGRES_URL') # Đường dẫn kết nối cơ sở dữ liệu PostgreSQL
     discord_webhook_url: str = os.getenv('DISCORD_WEBHOOK_URL') # Đường dẫn webhook Discord để nhận thông báo
     sender_name: str = os.getenv('SENDER_NAME') # Tên người gửi (Tên của website)
-    admin_email: str = os.getenv('ADMIN_EMAIL') # Địa chỉ email admin (Địa chỉ email dùng để gửi thông báo khi người dùng gửi form)
+    sender_email: str = os.getenv('SENDER_EMAIL') # Địa chỉ email dùng để gửi thông báo khi người dùng gửi form
+    recipient_name: str = os.getenv('RECIPIENT_NAME') # Tên người nhận thông báo khi người dùng gửi form
     recipient_email: str = os.getenv('RECIPIENT_EMAIL') # Địa chỉ email nhận thông báo khi người dùng gửi form
     smtp_server: str = os.getenv('SMTP_SERVER') # SMTP server
     smtp_port: int = int(os.getenv('SMTP_PORT')) # SMTP port
@@ -51,37 +52,22 @@ class Settings(BaseSettings):
     smtp_password: str = os.getenv('SMTP_PASSWORD') # SMTP password
 
 # Danh sách url được phép gọi API, thêm bất kỳ URL nào bạn muốn cho phép gọi API, giúp tránh lỗi CORS
-    origins_url_1: str = os.getenv('ORIGINS_URL_1')
-    origins_url_2: str = os.getenv('ORIGINS_URL_2')
-    origins_url_3: str = os.getenv('ORIGINS_URL_3')
-    origins_url_4: str = os.getenv('ORIGINS_URL_4')
-    origins_url_5: str = os.getenv('ORIGINS_URL_5')
-    origins_url_6: str = os.getenv('ORIGINS_URL_6')
-    origins_url_7: str = os.getenv('ORIGINS_URL_7')
-    origins_url_8: str = os.getenv('ORIGINS_URL_8')
+    origins_urls: list = [
+        os.getenv(f'ORIGINS_URL_{i+1}') for i in range(8) 
+        if os.getenv(f'ORIGINS_URL_{i+1}')
+    ]
 
     class Config:
         env_file = ".env"
-
+        extra = "ignore"
 
 settings = Settings()
-
-# Gán danh sách URL được phép gọi API vào biến origins_url
-origins_url = [
-    settings.origins_url_1,
-    settings.origins_url_2,
-    settings.origins_url_3,
-    settings.origins_url_4,
-    settings.origins_url_5,
-    settings.origins_url_6,
-    settings.origins_url_7,
-    settings.origins_url_8, 
-]
+sender_name = settings.sender_name
 
 # Cấu hình middleware cho phép CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins_url,
+    allow_origins=settings.origins_urls,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -149,13 +135,12 @@ async def submit_contact_form(
     db.refresh(db_contact_form)
 
     # Gửi thông báo qua Discord webhook
-    discord_message = f"[{settings.sender_name}] New contact form submission:\n\n *Time: {created_at}*\n\n- Name: {name}\n- Email: {email}\n- Phone: {phone}\n- Title: {title}\n- Message:\n\n{message}"
+    discord_message = f"[{sender_name}] New contact form submission:\n\n *Time: {created_at}*\n\n- Name: {name}\n- Email: {email}\n- Phone: {phone}\n- Title: {title}\n- Message:\n\n{message}"
     send_discord_notification(discord_message)
 
     # Gửi email thông báo
-    email_subject = f"[{settings.sender_name}] New Contact Form Submission"
-    email_message = f"[{settings.sender_name}] New Contact Form Submission\n\n *Time: {created_at}*\n\n- Name: {name}\n- Email: {email}\n- Phone: {phone}\n- Title: {title}\n- Message:\n\n{message}"
-    sender_name = settings.sender_name
+    email_subject = f"[{sender_name}] New Contact Form Submission"
+    email_message = f"[{sender_name}] New Contact Form Submission\n\n *Time: {created_at}*\n\n- Name: {name}\n- Email: {email}\n- Phone: {phone}\n- Title: {title}\n- Message:\n\n{message}"
     reply_to_name = name
     reply_to_email = email
     send_email(sender_name, email_subject, email_message, reply_to_name, reply_to_email)
@@ -181,16 +166,18 @@ def send_email(sender_name, subject, message, reply_to_name, reply_to_email):
     """
     Gửi email thông báo
     :param sender_name: Tên người gửi (Tên của website)
-    :param recipient_email: Địa chỉ email admin (Địa chỉ email dùng để nhận thông báo khi người dùng gửi form)
+    :param sender_email: Địa chỉ email người gửi (Địa chỉ email dùng để gửi thông báo khi người dùng gửi form)
+    :param recipient_name: Tên người nhận thông báo
+    :param recipient_email: Địa chỉ email dùng để nhận thông báo khi người dùng gửi form
     :param subject: Tiêu đề email
     :param message: Nội dung email
     :param reply_to_name: Tên người gửi form (Tên người dùng nhập vào form)
     :param reply_to_email: Địa chỉ email người gửi form (Địa chỉ email người dùng nhập vào form)
-    :return: True nếu gửi thành công, False nếu gửi thất bại
+    :param return: True nếu gửi thành công, False nếu gửi thất bại
     """
     msg = MIMEMultipart()
-    msg["From"] = f"{sender_name} <{settings.admin_email}>"
-    msg["To"] = settings.recipient_email
+    msg["From"] = f"{sender_name} <{settings.sender_email}>"
+    msg["To"] = f"{settings.recipient_name} <{settings.recipient_email}>"
     msg["Subject"] = subject
     msg["Reply-To"] = f"{reply_to_name} <{reply_to_email}>"
 
@@ -201,7 +188,11 @@ def send_email(sender_name, subject, message, reply_to_name, reply_to_email):
         server = smtplib.SMTP(settings.smtp_server, settings.smtp_port)
         server.starttls()
         server.login(settings.smtp_username, settings.smtp_password)
-        server.sendmail(settings.admin_email, settings.recipient_email, msg.as_string())
+        server.sendmail(
+            settings.sender_email, 
+            settings.recipient_email,
+              msg.as_string()
+              )
         server.quit()
         return True
     except Exception as e:
@@ -210,4 +201,4 @@ def send_email(sender_name, subject, message, reply_to_name, reply_to_email):
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
