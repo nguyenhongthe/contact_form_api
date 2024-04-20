@@ -61,20 +61,17 @@ class Settings(BaseSettings):
         env_file = ".env"
         extra = "ignore"
 
-settings = Settings()
-sender_name = settings.sender_name
-
 # Cấu hình middleware cho phép CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.origins_urls,
+    allow_origins=Settings().origins_urls,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Cấu hình SQLAlchemy
-SQLALCHEMY_DATABASE_URL = settings.postgres_url
+SQLALCHEMY_DATABASE_URL = Settings().postgres_url
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -140,15 +137,15 @@ async def submit_contact_form(
     db.refresh(db_contact_form)
 
     # Gửi thông báo qua Discord webhook
-    discord_message = f"[{sender_name}] New contact form submission:\n\n *Time: {created_at}*\n\n- Name: {name}\n- Email: {email}\n- Phone: {phone}\n- Title: {title}\n- Message:\n\n{message}"
+    discord_message = f"[{Settings().sender_name}] New contact form submission:\n\n *Time: {created_at}*\n\n- Name: {name}\n- Email: {email}\n- Phone: {phone}\n- Title: {title}\n- Message:\n\n{message}"
     send_discord_notification(discord_message)
 
     # Gửi email thông báo
-    email_subject = f"[{sender_name}] New Contact Form Submission"
-    email_message = f"[{sender_name}] New Contact Form Submission\n\n *Time: {created_at}*\n\n- Name: {name}\n- Email: {email}\n- Phone: {phone}\n- Title: {title}\n- Message:\n\n{message}"
+    email_subject = f"[{Settings().sender_name}] New Contact Form Submission"
+    email_message = f"[{Settings().sender_name}] New Contact Form Submission\n\n *Time: {created_at}*\n\n- Name: {name}\n- Email: {email}\n- Phone: {phone}\n- Title: {title}\n- Message:\n\n{message}"
     reply_to_name = name
     reply_to_email = email
-    send_email(sender_name, email_subject, email_message, reply_to_name, reply_to_email)
+    send_email(Settings().sender_name, email_subject, email_message, reply_to_name, reply_to_email)
 
     return {"success": True, "message": "Form submitted successfully"}
 
@@ -161,7 +158,7 @@ def send_discord_notification(message):
         "content": message
     }
     with httpx.Client() as client:
-        response = client.post(settings.discord_webhook_url, json=data)
+        response = client.post(Settings().discord_webhook_url, json=data)
         if response.status_code == 204:
             return True
         return False
@@ -181,8 +178,8 @@ def send_email(sender_name, subject, message, reply_to_name, reply_to_email):
     :param return: True nếu gửi thành công, False nếu gửi thất bại
     """
     msg = MIMEMultipart()
-    msg["From"] = f"{sender_name} <{settings.sender_email}>"
-    msg["To"] = f"{settings.recipient_name} <{settings.recipient_email}>"
+    msg["From"] = f"{sender_name} <{Settings().sender_email}>"
+    msg["To"] = f"{Settings().recipient_name} <{Settings().recipient_email}>"
     msg["Subject"] = subject
     msg["Reply-To"] = f"{reply_to_name} <{reply_to_email}>"
 
@@ -190,12 +187,12 @@ def send_email(sender_name, subject, message, reply_to_name, reply_to_email):
     msg.attach(body)
 
     try:
-        server = smtplib.SMTP(settings.smtp_server, settings.smtp_port)
+        server = smtplib.SMTP(Settings().smtp_server, Settings().smtp_port)
         server.starttls()
-        server.login(settings.smtp_username, settings.smtp_password)
+        server.login(Settings().smtp_username, Settings().smtp_password)
         server.sendmail(
-            settings.sender_email, 
-            settings.recipient_email,
+            Settings().sender_email, 
+            Settings().recipient_email,
               msg.as_string()
               )
         server.quit()
