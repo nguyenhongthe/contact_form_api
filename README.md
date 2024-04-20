@@ -4,6 +4,7 @@ Welcome to Contact Form API documentation. This is FastAPI-based API is designed
 
 ## Table of Contents
 
+- [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Usage](#usage)
@@ -42,6 +43,15 @@ The API is built using the following libraries:
 - [Discord Webhooks](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) - Discord Webhooks
 
 ## Installation
+
+### Running Locally
+
+To run the API locally, follow these steps:
+
+**Note:**
+
+   - Make sure you have Python 3.8+ installed on your system.
+   - You need to have a PostgreSQL database running on your system and create a database for the API. Refer to the [PostgreSQL documentation](https://www.postgresql.org/docs/) for more information.
 
 1. Clone the repository:
 

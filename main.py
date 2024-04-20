@@ -106,7 +106,12 @@ async def root():
     """
     return {"message": "Hello World"}
 
-
+@app.get("/api")
+async def api():
+    """
+    fake api
+    """
+    return {"message": "Hello API"}
 
 @app.post("/submit-contact-form")
 async def submit_contact_form(
