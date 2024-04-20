@@ -19,7 +19,7 @@ Welcome to Contact Form API documentation. This is FastAPI-based API is designed
   - Phone
   - Title
   - Message
-- Send email notifications to the recipient
+- Send email notifications to the recipient using an SMTP server
 - Send Discord notifications to a Discord webhook
 - Store contact form submissions in a PostgreSQL database
 - API documentation using Swagger UI and ReDoc
