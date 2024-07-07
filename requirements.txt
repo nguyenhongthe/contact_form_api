@@ -1,6 +1,6 @@
 arrow
 uvicorn[standard]
-fastapi==0.110.2
+fastapi==0.111.0
 python-multipart==0.0.9
 python-dotenv==1.0.1
 pydantic-settings==2.2.1
