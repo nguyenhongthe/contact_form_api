@@ -1,9 +1,8 @@
 import os
 import arrow
 
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+import smtplib, ssl
+from email.message import EmailMessage
 
 import httpx
 from dotenv import load_dotenv
@@ -21,7 +20,7 @@ load_dotenv()
 app = FastAPI(
     title="Contact Form API",
     description="This is FastAPI-based API is designed for submitting contact forms and receiving notifications.",
-    version="1.0.0",
+    version="1.0.2",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
@@ -37,64 +36,110 @@ app = FastAPI(
     },
 )
 
-
 # Cấu hình chung
 class Settings(BaseSettings):
-    postgres_url: str = os.getenv('POSTGRES_URL') # Đường dẫn kết nối cơ sở dữ liệu PostgreSQL
-    discord_webhook_url: str = os.getenv('DISCORD_WEBHOOK_URL') # Đường dẫn webhook Discord để nhận thông báo
-    sender_name: str = os.getenv('SENDER_NAME') # Tên người gửi (Tên của website)
-    sender_email: str = os.getenv('SENDER_EMAIL') # Địa chỉ email dùng để gửi thông báo khi người dùng gửi form
-    recipient_name: str = os.getenv('RECIPIENT_NAME') # Tên người nhận thông báo khi người dùng gửi form
-    recipient_email: str = os.getenv('RECIPIENT_EMAIL') # Địa chỉ email nhận thông báo khi người dùng gửi form
-    smtp_server: str = os.getenv('SMTP_SERVER') # SMTP server
-    smtp_port: int = int(os.getenv('SMTP_PORT')) # SMTP port
-    smtp_username: str = os.getenv('SMTP_USERNAME') # SMTP username
-    smtp_password: str = os.getenv('SMTP_PASSWORD') # SMTP password
-
-# Danh sách url được phép gọi API, thêm bất kỳ URL nào bạn muốn cho phép gọi API, giúp tránh lỗi CORS
+    postgres_url: str = os.getenv('POSTGRES_URL')  # Đường dẫn kết nối cơ sở dữ liệu PostgreSQL
+    discord_webhook_url: str = os.getenv('DISCORD_WEBHOOK_URL')  # Đường dẫn webhook Discord để nhận thông báo
+    email_subject: str = os.getenv('EMAIL_SUBJECT')  # Tiêu đề email thông báo
+    sender_name: str = os.getenv('SENDER_NAME')  # Tên người gửi (Tên của website)
+    sender_email: str = os.getenv('SENDER_EMAIL')  # Địa chỉ email dùng để gửi thông báo khi người dùng gửi form
+    recipient_name: str = os.getenv('RECIPIENT_NAME')  # Tên người nhận thông báo khi người dùng gửi form
+    recipient_email: str = os.getenv('RECIPIENT_EMAIL')  # Địa chỉ email nhận thông báo khi người dùng gửi form
+    smtp_server: str = os.getenv('SMTP_SERVER')  # SMTP server
+    smtp_port: int = int(os.getenv('SMTP_PORT', 0))  # Cổng SMTP
+    smtp_username: str = os.getenv('SMTP_USERNAME')  # Tên đăng nhập SMTP
+    smtp_password: str = os.getenv('SMTP_PASSWORD')  # Mật khẩu SMTP
     origins_urls: list = [
-        os.getenv(f'ORIGINS_URL_{i+1}') for i in range(8) 
+        os.getenv(f'ORIGINS_URL_{i+1}') for i in range(int(os.getenv('ORIGINS_URL_COUNT', '10')))
         if os.getenv(f'ORIGINS_URL_{i+1}')
-    ]
+    ] # Danh sách URL được phép gọi API
 
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+config = Settings()
 
-# Cấu hình middleware cho phép CORS
+# Thiết lập CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=Settings().origins_urls,
+    allow_origins=config.origins_urls,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
-# Cấu hình SQLAlchemy
-SQLALCHEMY_DATABASE_URL = Settings().postgres_url
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+# Thiết lập kết nối tới cơ sở dữ liệu PostgreSQL
+engine = create_engine(config.postgres_url)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# Chuyển đổi thời gian sang định dạng chuẩn ISO 8601 (YYYY-MM-DD HH:mm:ss) và có múi giờ GMT+7 để lưu vào database
-created_at = arrow.utcnow().to('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss')
+# Lấy thời gian hiện tại theo múi giờ Asia/Ho_Chi_Minh
+timestamp = arrow.utcnow().to('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss')
 
-
-# Tạo cơ sở dữ liệu
 class ContactForm(Base):
+    """
+    Định nghĩa bảng dữ liệu contact_forms
+    """
     __tablename__ = "contact_forms"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     email = Column(String, index=True)
-    phone = Column(String)
-    title = Column(String)
-    message = Column(String)
-    created_at = Column(String, default=created_at)
-
+    phone = Column(String, index=True)
+    title = Column(String, index=True)
+    message = Column(String, index=True)
+    created_at = Column(String, index=True, default=timestamp)
 
 Base.metadata.create_all(bind=engine)
 
+def send_email(config, send_message, name, email):
+    """
+    Gửi email thông báo
+    """
+    msg = EmailMessage()
+    msg['Subject'] = config.email_subject
+    msg['From'] = f"{config.sender_name} <{config.sender_email}>"
+    msg['To'] = f"{config.recipient_name} <{config.recipient_email}>"
+    msg['Reply-To'] = f"{name} <{email}>"
+    msg.set_content(send_message)
+
+    try:
+        if config.smtp_port == 465:
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL(config.smtp_server, config.smtp_port, context=context) as server:
+                server.login(config.smtp_username, config.smtp_password)
+                server.send_message(msg)
+        elif config.smtp_port == 587:
+            with smtplib.SMTP(config.smtp_server, config.smtp_port) as server:
+                server.starttls()
+                server.login(config.smtp_username, config.smtp_password)
+                server.send_message(msg)
+        else:
+            print("Use 465 / 587 as port value")
+            return
+        print("Successfully sent email")
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+
+async def send_discord_notification(config, message):
+    """
+    Gửi thông báo tới Discord
+    """
+    webhook_url = config.discord_webhook_url
+    payload = {"content": message}
+    async with httpx.AsyncClient() as client:
+        response = await client.post(webhook_url, json=payload)
+        if response.status_code == 204:
+            print("Successfully sent notification to Discord")
+        else:
+            print(f"Failed to send notification to Discord: {response.status_code}")
+
+def save_to_postgresql(name, email, phone, title, message):
+    """
+    Lưu dữ liệu vào PostgreSQL
+    """
+    session = SessionLocal()
+    contact_form = ContactForm(name=name, email=email, phone=phone, title=title, message=message, created_at=timestamp)
+    session.add(contact_form)
+    session.commit()
+    session.close()
 
 @app.get("/")
 async def root():
@@ -110,97 +155,22 @@ async def api():
     """
     return {"message": "Hello API"}
 
-@app.post("/submit-contact-form")
+@app.post("/submit_contact_form")
 async def submit_contact_form(
-        name: str = Form(...),
-        email: str = Form(...),
-        phone: str = Form(...),
-        title: str = Form(...),
-        message: str = Form(...),
+    name: str = Form(...),
+    email: str = Form(...),
+    phone: str = Form(...),
+    title: str = Form(...),
+    message: str = Form(...)
 ):
     """
     API gửi form liên hệ
     """
-    print("Dữ liệu nhận được từ form:")
-    print("Tên:", name)
-    print("Email:", email)
-    print("Số điện thoại:", phone)
-    print("Tiêu đề:", title)
-    print("Lời nhắn:", message)
-    print("Gửi lúc:", created_at)
-
-    # Lưu dữ liệu vào database
-    db = SessionLocal()
-    db_contact_form = ContactForm(name=name, email=email, phone=phone, title=title, message=message, created_at=created_at)
-    db.add(db_contact_form)
-    db.commit()
-    db.refresh(db_contact_form)
-
-    # Gửi thông báo qua Discord webhook
-    discord_message = f"[{Settings().sender_name}] New contact form submission:\n\n *Time: {created_at}*\n\n- Name: {name}\n- Email: {email}\n- Phone: {phone}\n- Title: {title}\n- Message:\n\n{message}"
-    send_discord_notification(discord_message)
-
-    # Gửi email thông báo
-    email_subject = f"[{Settings().sender_name}] New Contact Form Submission"
-    email_message = f"[{Settings().sender_name}] New Contact Form Submission\n\n *Time: {created_at}*\n\n- Name: {name}\n- Email: {email}\n- Phone: {phone}\n- Title: {title}\n- Message:\n\n{message}"
-    reply_to_name = name
-    reply_to_email = email
-    send_email(Settings().sender_name, email_subject, email_message, reply_to_name, reply_to_email)
-
-    return {"success": True, "message": "Form submitted successfully"}
-
-# Hàm gửi thông báo qua Discord webhook
-def send_discord_notification(message):
-    """
-    Gửi thông báo qua Discord webhook
-    """
-    data = {
-        "content": message
-    }
-    with httpx.Client() as client:
-        response = client.post(Settings().discord_webhook_url, json=data)
-        if response.status_code == 204:
-            return True
-        return False
-
-# Hàm gửi email thông báo
-def send_email(sender_name, subject, message, reply_to_name, reply_to_email):
-    """
-    Gửi email thông báo
-    :param sender_name: Tên người gửi (Tên của website)
-    :param sender_email: Địa chỉ email người gửi (Địa chỉ email dùng để gửi thông báo khi người dùng gửi form)
-    :param recipient_name: Tên người nhận thông báo
-    :param recipient_email: Địa chỉ email dùng để nhận thông báo khi người dùng gửi form
-    :param subject: Tiêu đề email
-    :param message: Nội dung email
-    :param reply_to_name: Tên người gửi form (Tên người dùng nhập vào form)
-    :param reply_to_email: Địa chỉ email người gửi form (Địa chỉ email người dùng nhập vào form)
-    :param return: True nếu gửi thành công, False nếu gửi thất bại
-    """
-    msg = MIMEMultipart()
-    msg["From"] = f"{sender_name} <{Settings().sender_email}>"
-    msg["To"] = f"{Settings().recipient_name} <{Settings().recipient_email}>"
-    msg["Subject"] = subject
-    msg["Reply-To"] = f"{reply_to_name} <{reply_to_email}>"
-
-    body = MIMEText(message, "plain", "utf-8")
-    msg.attach(body)
-
-    try:
-        server = smtplib.SMTP(Settings().smtp_server, Settings().smtp_port)
-        server.starttls()
-        server.login(Settings().smtp_username, Settings().smtp_password)
-        server.sendmail(
-            Settings().sender_email, 
-            Settings().recipient_email,
-              msg.as_string()
-              )
-        server.quit()
-        return True
-    except Exception as e:
-        print("Email sending failed:", str(e))
-        return False
-
+    send_message = f"[{config.sender_name}] New contact form submission:\n\n *Time: {timestamp}*\n\n- Name: {name}\n- Email: {email}\n- Phone: {phone}\n- Title: {title}\n- Message:\n\n{message}"
+    send_email(config, send_message, name, email)
+    await send_discord_notification(config, send_message)
+    save_to_postgresql(name, email, phone, title, message)
+    return {"message": "Contact form submitted successfully"}
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
