@@ -1,6 +1,6 @@
 # Contact Form API
 
-Welcome to Contact Form API documentation. This is FastAPI-based API is designed for submitting contact forms and receiving notifications. Follow the instructions below to install and use the API.
+This is FastAPI-based API is designed for submitting contact forms and receiving notifications. Follow the instructions below to install and use the API.
 
 ## Table of Contents
 
@@ -35,7 +35,6 @@ The API is built using the following libraries:
 - [SQLAlchemy](https://www.sqlalchemy.org/) - Database ORM
 - [PostgreSQL](https://www.postgresql.org/) - Database
 - [Psycopg](https://pypi.org/project/psycopg2-binary/) - psycopg2 - Python-PostgreSQL Database Adapter
-- [Python-Multipart](https://pypi.org/project/python-multipart/) - A streaming multipart parser for Python.
 - [smtp](https://docs.python.org/3/library/smtplib.html) - Email sending
 - [uvicorn](https://www.uvicorn.org/) - ASGI server
 - [python-dotenv](https://pypi.org/project/python-dotenv/) - Environment variables
