@@ -1,6 +1,6 @@
 arrow
 uvicorn[standard]
-fastapi==0.111.0
+fastapi==0.111.1
 python-dotenv==1.0.1
 pydantic-settings==2.3.4
 databases==0.9.0
