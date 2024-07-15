@@ -20,7 +20,7 @@ load_dotenv()
 app = FastAPI(
     title="Contact Form API",
     description="This is FastAPI-based API is designed for submitting contact forms and receiving notifications.",
-    version="1.0.2",
+    version="1.0.3",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
